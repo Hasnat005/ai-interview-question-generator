@@ -62,7 +62,7 @@ src/
 ## API usage
 
 - Interview generation lives in `src/utils/gemini.ts` and targets `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent`.
-- The helper auto-formats prompts, trims Gemini responses, and falls back to curated questions if the API is unavailable.
+- The helper auto-formats prompts, validates responses, and surfaces clear errors if Gemini cannot produce questions.
 - The `App` component consumes this helper and uses `import.meta.env.VITE_GEMINI_API_KEY` at runtime while surfacing clipboard and error feedback.
 
 ## Next steps

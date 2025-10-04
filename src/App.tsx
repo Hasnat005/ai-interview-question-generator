@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { generateInterviewQuestions } from './utils/gemini'
 
 const API_ERROR_MESSAGE = 'Something went wrong. Please try again later.'
@@ -62,6 +63,14 @@ export function App() {
     }
   }
 
+  const handleClear = () => {
+    setJobTitle('')
+    setExperience('Mid-Level')
+    setQuestions([])
+    setError(null)
+    setCopyStatus('idle')
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
       <div className="w-full max-w-xl rounded-3xl bg-slate-900/80 p-10 text-center shadow-2xl shadow-slate-900/40 backdrop-blur">
@@ -112,13 +121,23 @@ export function App() {
             </select>
           </div>
 
-          <button
-            type="submit"
-            disabled={isGenerateDisabled}
-            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-violet-500/30 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? 'Generating questions…' : 'Generate Questions'}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="submit"
+              disabled={isGenerateDisabled}
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-violet-500/30 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? 'Generating questions…' : 'Generate Questions'}
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={loading && !hasQuestions}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-700 bg-slate-950/40 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-slate-200 shadow-inner transition hover:border-slate-500 hover:bg-slate-900/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
 
           {error ? (
             <p className="text-sm text-rose-300">{error}</p>
@@ -149,25 +168,64 @@ export function App() {
               </p>
             ) : null}
 
-            {hasQuestions ? (
-              <ol className="space-y-3 text-sm leading-relaxed text-slate-200">
-                {questions.map((question, index) => (
-                  <li key={question} className="pl-2">
-                    <span className="font-semibold text-violet-200">{index + 1}.</span> {question}
-                  </li>
-                ))}
-              </ol>
-            ) : loading ? (
-              <p className="text-sm italic text-slate-500">
-                Generating questions…
-              </p>
-            ) : (
-              <p className="text-sm italic text-slate-500">
-                {error === EMPTY_RESULT_MESSAGE
-                  ? EMPTY_RESULT_MESSAGE
-                  : 'Questions will appear here…'}
-              </p>
-            )}
+            <AnimatePresence mode="wait">
+              {hasQuestions ? (
+                <motion.ol
+                  key="questions"
+                  className="space-y-3 text-sm leading-relaxed text-slate-200"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                >
+                  {questions.map((question, index) => (
+                    <motion.li
+                      key={`${question}-${index}`}
+                      className="pl-2"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                    >
+                      <span className="font-semibold text-violet-200">{index + 1}.</span> {question}
+                    </motion.li>
+                  ))}
+                </motion.ol>
+              ) : loading ? (
+                <motion.div
+                  key="loading"
+                  className="flex flex-col items-center gap-3 py-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-center gap-2 text-violet-200">
+                    {[0, 1, 2].map((dot) => (
+                      <motion.span
+                        key={dot}
+                        className="block h-2 w-2 rounded-full bg-current"
+                        animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+                        transition={{ duration: 0.8, repeat: Infinity, delay: dot * 0.15, ease: 'easeInOut' }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm italic text-slate-500">Crafting tailored questions…</p>
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="placeholder"
+                  className="text-sm italic text-slate-500"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {error === EMPTY_RESULT_MESSAGE
+                    ? EMPTY_RESULT_MESSAGE
+                    : 'Questions will appear here…'}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
         </form>
       </div>
