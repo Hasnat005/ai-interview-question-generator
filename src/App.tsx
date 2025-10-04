@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { generateInterviewQuestions } from './utils/gemini'
+import {
+  generateInterviewQuestions,
+  type GeneratedQuestionCard,
+} from './utils/gemini'
 
 const API_ERROR_MESSAGE = 'Something went wrong. Please try again later.'
 const EMPTY_RESULT_MESSAGE = 'No questions found. Try a different title.'
@@ -8,12 +11,13 @@ const EMPTY_RESULT_MESSAGE = 'No questions found. Try a different title.'
 export function App() {
   const [jobTitle, setJobTitle] = useState('')
   const [experience, setExperience] = useState('Mid-Level')
-  const [questions, setQuestions] = useState<string[]>([])
+  const [questions, setQuestions] = useState<GeneratedQuestionCard[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>(
     'idle',
   )
+  const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({})
 
   const isGenerateDisabled = jobTitle.trim().length === 0 || loading
   const hasQuestions = questions.length > 0
@@ -27,6 +31,7 @@ export function App() {
     setLoading(true)
     setError(null)
     setCopyStatus('idle')
+    setFlippedCards({})
 
     try {
       const generatedQuestions = await generateInterviewQuestions(
@@ -54,7 +59,38 @@ export function App() {
     if (!hasQuestions) return
 
     try {
-      await navigator.clipboard.writeText(questions.map((question, index) => `${index + 1}. ${question}`).join('\n'))
+      await navigator.clipboard.writeText(
+        questions
+          .map((card, index) => {
+            const formattedQuestion = formatQuestion(card)
+            const parts = [
+              `${index + 1}. ${formattedQuestion || card.question}`,
+              `Type: ${card.type === 'technical' ? 'Technical' : 'Behavioral'} (${card.difficulty})`,
+            ]
+
+            if (card.suggestedAnswer) {
+              parts.push(`Suggested Answer: ${card.suggestedAnswer}`)
+            }
+            if (card.keyTips.length) {
+              parts.push(`Key Tips: ${card.keyTips.join(' | ')}`)
+            }
+            if (card.keywords.length) {
+              parts.push(`Keywords: ${card.keywords.join(', ')}`)
+            }
+            if (card.codeExample) {
+              parts.push(`Code Example:\n${card.codeExample}`)
+            }
+            if (card.behavioralStructure?.length) {
+              parts.push(`Answer Structure: ${card.behavioralStructure.join(' -> ')}`)
+            }
+            if (card.referenceUrl) {
+              parts.push(`Further Reading: ${card.referenceUrl}`)
+            }
+
+            return parts.join('\n')
+          })
+          .join('\n\n'),
+      )
       setCopyStatus('copied')
       setTimeout(() => setCopyStatus('idle'), 1500)
     } catch (error) {
@@ -69,6 +105,38 @@ export function App() {
     setQuestions([])
     setError(null)
     setCopyStatus('idle')
+    setFlippedCards({})
+  }
+
+  const toggleCardFlip = (index: number) => {
+    setFlippedCards((previous) => ({
+      ...previous,
+      [index]: !previous[index],
+    }))
+  }
+
+  const getMotivationLine = (card: GeneratedQuestionCard) => {
+    if (card.type === 'technical') {
+      return 'Stay curious—lead with clarity, validate with data, and ship with confidence.'
+    }
+
+    return 'Share your impact with heart, show the growth, and let your story inspire.'
+  }
+
+  const formatQuestion = (card: GeneratedQuestionCard) => {
+    const rawQuestion = card.question.replace(/\s+/g, ' ').trim()
+    if (!rawQuestion) return ''
+
+    if (/^as\s+(?:a|an)\s+/i.test(rawQuestion)) {
+      return rawQuestion.charAt(0).toUpperCase() + rawQuestion.slice(1)
+    }
+
+    const experienceLabel = experience.toLowerCase()
+    const roleLabel = jobTitle.trim() || 'candidate'
+    const leadingLower = rawQuestion.charAt(0).toLowerCase() + rawQuestion.slice(1)
+    const enriched = `As a ${experienceLabel} ${roleLabel}, ${leadingLower}`
+
+    return enriched.endsWith('?') ? enriched : `${enriched}?`
   }
 
   return (
@@ -132,8 +200,8 @@ export function App() {
             <button
               type="button"
               onClick={handleClear}
-              disabled={loading && !hasQuestions}
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-700 bg-slate-950/40 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-slate-200 shadow-inner transition hover:border-slate-500 hover:bg-slate-900/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-300 bg-slate-100/80 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 shadow-inner transition hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white hover:text-slate-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
             >
               Clear
             </button>
@@ -170,30 +238,61 @@ export function App() {
 
             <AnimatePresence mode="wait">
               {hasQuestions ? (
-                <motion.ol
+                <motion.div
                   key="questions"
-                  className="space-y-3 text-sm leading-relaxed text-slate-200"
+                  className="mt-4 max-h-[26rem] space-y-4 overflow-y-auto pr-1"
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
-                  {questions.map((question, index) => (
-                    <motion.li
-                      key={`${question}-${index}`}
-                      className="pl-2"
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                  {questions.map((card, index) => (
+                    <motion.div
+                      key={`${card.question}-${index}`}
+                      className="mx-auto max-w-md px-2"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: index * 0.05 }}
                     >
-                      <span className="font-semibold text-violet-200">{index + 1}.</span> {question}
-                    </motion.li>
+                      <motion.button
+                        type="button"
+                        onClick={() => toggleCardFlip(index)}
+                        className="group relative block w-full cursor-pointer focus:outline-none"
+                        style={{ perspective: 1200 }}
+                        whileHover={{ scale: 1.015 }}
+                        transition={{ duration: 0.25 }}
+                      >
+                        <motion.div
+                          className="relative w-full min-h-[160px] rounded-xl bg-white p-6 text-left text-slate-900 shadow-md transition-shadow duration-300 group-hover:shadow-lg"
+                          style={{ transformStyle: 'preserve-3d' }}
+                          animate={{ rotateY: flippedCards[index] ? 180 : 0 }}
+                          transition={{ duration: 0.45, ease: 'easeInOut' }}
+                        >
+                          <div
+                            className="flex h-full items-center justify-center"
+                            style={{ backfaceVisibility: 'hidden' }}
+                          >
+                            <p className="text-center text-lg font-semibold leading-relaxed text-slate-800">
+                              {formatQuestion(card)}
+                            </p>
+                          </div>
+                          <motion.div
+                            className="absolute inset-0 flex h-full items-center justify-center rounded-xl bg-gray-50 p-6 text-gray-900 shadow-md"
+                            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', transformStyle: 'preserve-3d' }}
+                          >
+                            <p className="text-center text-base font-semibold leading-relaxed">
+                              {getMotivationLine(card)}
+                            </p>
+                          </motion.div>
+                        </motion.div>
+                      </motion.button>
+                    </motion.div>
                   ))}
-                </motion.ol>
+                </motion.div>
               ) : loading ? (
                 <motion.div
                   key="loading"
-                  className="flex flex-col items-center gap-3 py-4"
+                  className="flex flex-col items-center gap-3 py-6"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -203,9 +302,9 @@ export function App() {
                     {[0, 1, 2].map((dot) => (
                       <motion.span
                         key={dot}
-                        className="block h-2 w-2 rounded-full bg-current"
-                        animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
-                        transition={{ duration: 0.8, repeat: Infinity, delay: dot * 0.15, ease: 'easeInOut' }}
+                        className="block h-2.5 w-2.5 rounded-full bg-current"
+                        animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.3, 0.8] }}
+                        transition={{ duration: 0.9, repeat: Infinity, delay: dot * 0.18, ease: 'easeInOut' }}
                       />
                     ))}
                   </div>
