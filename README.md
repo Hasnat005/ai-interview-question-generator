@@ -25,6 +25,18 @@ npm run dev
 
 The dev server will print a local URL; open it in your browser to see the landing page with sample interview prompts.
 
+### Configure the Gemini API key
+
+The UI generates questions via the Google Gemini Generative Language API. Provide your API key in a `.env` file before attempting to generate questions:
+
+```text
+cp .env.example .env
+# edit .env and set VITE_GEMINI_API_KEY=AIzaSy...
+```
+
+> ⚠️ Never commit your real API key. The `.env` file is already listed in `.gitignore`.
+> New Gemini API keys are available at <https://aistudio.google.com/app/apikey>.
+
 ## Available scripts
 
 ```powershell
@@ -38,14 +50,20 @@ npm run lint     # Run ESLint against the codebase
 
 ```
 src/
-  components/   Reusable UI building blocks (e.g., header, cards)
-  pages/        Top-level route views (Home page seeded by default)
-  utils/        Helper logic such as question templates
-  styles/       Global style sheets consumed by the app entry point
-  assets/       Static assets bundled by Vite
+  App.tsx         Main UI and Gemini integration
+  main.tsx        React entry point
+  index.css       Tailwind entry stylesheet
+  components/     Reusable UI building blocks (e.g., header, cards)
+  pages/          Top-level route views (Home page seeded by default)
+  utils/          Helper logic such as question templates and Gemini helper
+  assets/         Static assets bundled by Vite
 ```
 
-`src/pages/Home.tsx` renders a hero section, highlights a generated question, and hooks up the utility helpers for sample prompts. `src/styles/global.css` defines the base theme consumed by `src/main.tsx`.
+## API usage
+
+- Interview generation lives in `src/utils/gemini.ts` and targets `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent`.
+- The helper auto-formats prompts, trims Gemini responses, and falls back to curated questions if the API is unavailable.
+- The `App` component consumes this helper and uses `import.meta.env.VITE_GEMINI_API_KEY` at runtime while surfacing clipboard and error feedback.
 
 ## Next steps
 

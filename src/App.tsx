@@ -1,28 +1,52 @@
 import { useState, type FormEvent } from 'react'
+import { generateInterviewQuestions } from './utils/gemini'
+
+const API_ERROR_MESSAGE = 'Something went wrong. Please try again later.'
+const EMPTY_RESULT_MESSAGE = 'No questions found. Try a different title.'
 
 export function App() {
   const [jobTitle, setJobTitle] = useState('')
-  const [experienceLevel, setExperienceLevel] = useState('Mid-Level')
+  const [experience, setExperience] = useState('Mid-Level')
   const [questions, setQuestions] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>(
+    'idle',
+  )
 
-  const isGenerateDisabled = jobTitle.trim().length === 0
+  const isGenerateDisabled = jobTitle.trim().length === 0 || loading
   const hasQuestions = questions.length > 0
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     const trimmedTitle = jobTitle.trim()
     if (!trimmedTitle) return
 
-    const basePrompt = `${experienceLevel} ${trimmedTitle}`.trim()
+    setLoading(true)
+    setError(null)
+    setCopyStatus('idle')
 
-    setQuestions([
-      `How would you describe the core responsibilities of a ${basePrompt}?`,
-      `Walk me through a recent project where you demonstrated strengths required for a ${basePrompt}.`,
-      `What metrics or signals do you use to evaluate success in a ${basePrompt} role?`,
-      `Describe a challenging scenario a ${basePrompt} might encounter and how you would resolve it.`,
-      `How do you stay current with industry trends relevant to being a ${basePrompt}?`,
-    ])
+    try {
+      const generatedQuestions = await generateInterviewQuestions(
+        trimmedTitle,
+        experience,
+      )
+
+      if (!generatedQuestions.length) {
+        setError(EMPTY_RESULT_MESSAGE)
+        setQuestions([])
+        return
+      }
+
+      setQuestions(generatedQuestions)
+    } catch (error) {
+      console.error('Failed to generate interview questions', error)
+      setError(API_ERROR_MESSAGE)
+      setQuestions([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCopyAll = async () => {
@@ -30,8 +54,11 @@ export function App() {
 
     try {
       await navigator.clipboard.writeText(questions.map((question, index) => `${index + 1}. ${question}`).join('\n'))
+      setCopyStatus('copied')
+      setTimeout(() => setCopyStatus('idle'), 1500)
     } catch (error) {
       console.error('Failed to copy questions to clipboard', error)
+      setCopyStatus('error')
     }
   }
 
@@ -75,8 +102,8 @@ export function App() {
             </label>
             <select
               id="experience-level"
-              value={experienceLevel}
-              onChange={(event) => setExperienceLevel(event.target.value)}
+              value={experience}
+              onChange={(event) => setExperience(event.target.value)}
               className="w-full rounded-2xl border border-slate-700 bg-slate-950/40 px-4 py-3 text-base text-slate-100 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/60"
             >
               <option>Junior</option>
@@ -90,8 +117,12 @@ export function App() {
             disabled={isGenerateDisabled}
             className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-violet-500/30 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Generate Questions
+            {loading ? 'Generating questions…' : 'Generate Questions'}
           </button>
+
+          {error ? (
+            <p className="text-sm text-rose-300">{error}</p>
+          ) : null}
 
           <div className="rounded-2xl border border-slate-800 bg-slate-950/30 px-5 py-6 text-slate-200">
             <div className="mb-4 flex items-center justify-between">
@@ -108,6 +139,16 @@ export function App() {
               </button>
             </div>
 
+            {copyStatus === 'copied' ? (
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                Copied!
+              </p>
+            ) : copyStatus === 'error' ? (
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-rose-300">
+                Unable to copy. Please try again.
+              </p>
+            ) : null}
+
             {hasQuestions ? (
               <ol className="space-y-3 text-sm leading-relaxed text-slate-200">
                 {questions.map((question, index) => (
@@ -116,9 +157,15 @@ export function App() {
                   </li>
                 ))}
               </ol>
+            ) : loading ? (
+              <p className="text-sm italic text-slate-500">
+                Generating questions…
+              </p>
             ) : (
               <p className="text-sm italic text-slate-500">
-                Questions will appear here…
+                {error === EMPTY_RESULT_MESSAGE
+                  ? EMPTY_RESULT_MESSAGE
+                  : 'Questions will appear here…'}
               </p>
             )}
           </div>
