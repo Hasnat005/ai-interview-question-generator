@@ -61,35 +61,8 @@ export function App() {
     try {
       await navigator.clipboard.writeText(
         questions
-          .map((card, index) => {
-            const formattedQuestion = formatQuestion(card)
-            const parts = [
-              `${index + 1}. ${formattedQuestion || card.question}`,
-              `Type: ${card.type === 'technical' ? 'Technical' : 'Behavioral'} (${card.difficulty})`,
-            ]
-
-            if (card.suggestedAnswer) {
-              parts.push(`Suggested Answer: ${card.suggestedAnswer}`)
-            }
-            if (card.keyTips.length) {
-              parts.push(`Key Tips: ${card.keyTips.join(' | ')}`)
-            }
-            if (card.keywords.length) {
-              parts.push(`Keywords: ${card.keywords.join(', ')}`)
-            }
-            if (card.codeExample) {
-              parts.push(`Code Example:\n${card.codeExample}`)
-            }
-            if (card.behavioralStructure?.length) {
-              parts.push(`Answer Structure: ${card.behavioralStructure.join(' -> ')}`)
-            }
-            if (card.referenceUrl) {
-              parts.push(`Further Reading: ${card.referenceUrl}`)
-            }
-
-            return parts.join('\n')
-          })
-          .join('\n\n'),
+          .map((card, index) => `${index + 1}. ${formatQuestion(card) || card.question}`)
+          .join('\n'),
       )
       setCopyStatus('copied')
       setTimeout(() => setCopyStatus('idle'), 1500)
@@ -115,13 +88,8 @@ export function App() {
     }))
   }
 
-  const getMotivationLine = (card: GeneratedQuestionCard) => {
-    if (card.type === 'technical') {
-      return 'Stay curious—lead with clarity, validate with data, and ship with confidence.'
-    }
-
-    return 'Share your impact with heart, show the growth, and let your story inspire.'
-  }
+  const getMotivationLine = () =>
+    'You already have the story—focus on clarity, stay calm, and let your strengths shine.'
 
   const formatQuestion = (card: GeneratedQuestionCard) => {
     const rawQuestion = card.question.replace(/\s+/g, ' ').trim()
@@ -281,7 +249,7 @@ export function App() {
                             style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', transformStyle: 'preserve-3d' }}
                           >
                             <p className="text-center text-base font-semibold leading-relaxed">
-                              {getMotivationLine(card)}
+                              {getMotivationLine()}
                             </p>
                           </motion.div>
                         </motion.div>
